@@ -1,0 +1,173 @@
+server:
+  port: 8082
+  servlet:
+    context-path: /stock-service
+
+spring:
+  application:
+    name: stock-service
+
+  profiles:
+    active: dev
+
+  # Jackson JSON 配置
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: GMT+8
+    serialization:
+      write-dates-as-timestamps: false
+    default-property-inclusion: non_null
+
+  # JPA 配置 (为未来数据库集成预留)
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+        format_sql: true
+
+  # Redis 配置
+  redis:
+    host: localhost
+    port: 6379
+    password: redis123456
+    timeout: 2000ms
+    database: 0
+    lettuce:
+      pool:
+        max-active: 8
+        max-wait: -1ms
+        max-idle: 8
+        min-idle: 0
+
+  # 数据库配置 (为未来集成预留)
+  datasource:
+    url: jdbc:mysql://localhost:3306/quant_trading?useSSL=false&serverTimezone=GMT%2B8&characterEncoding=utf8&useUnicode=true
+    username: root
+    password: root123456
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      connection-timeout: 30000
+      idle-timeout: 600000
+      max-lifetime: 1800000
+
+# Market Data Service 配置
+market-data:
+  service:
+    url: http://localhost:5001
+    connection-timeout: 5000
+    read-timeout: 30000
+    retry:
+      max-attempts: 3
+      delay: 1000
+
+# 缓存配置
+cache:
+  stock:
+    # 股票历史数据缓存时间（秒）
+    history-ttl: 300
+    # 股票实时数据缓存时间（秒）
+    realtime-ttl: 30
+    # 股票基础信息缓存时间（秒）
+    info-ttl: 86400
+
+# API 文档配置
+springdoc:
+  api-docs:
+    path: /api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+
+# 监控配置
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+
+# 日志配置
+logging:
+  level:
+    root: INFO
+    com.quant.stock: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.cache: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%logger{36}] - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level [%logger{36}] - %msg%n"
+  file:
+    name: logs/stock-service.log
+    max-size: 10MB
+    max-history: 30
+
+---
+# 开发环境配置
+spring:
+  config:
+    activate:
+      on-profile: dev
+
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: create-drop
+
+logging:
+  level:
+    com.quant.stock: DEBUG
+
+---
+# 测试环境配置
+spring:
+  config:
+    activate:
+      on-profile: test
+
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=MySQL;DATABASE_TO_LOWER=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    database-platform: org.hibernate.dialect.H2Dialect
+
+---
+# 生产环境配置
+spring:
+  config:
+    activate:
+      on-profile: prod
+
+  redis:
+    host: ${REDIS_HOST:localhost}
+    port: ${REDIS_PORT:6379}
+    password: ${REDIS_PASSWORD:redis123456}
+
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/quant_trading?useSSL=false&serverTimezone=GMT%2B8&characterEncoding=utf8&useUnicode=true}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:root123456}
+
+market-data:
+  service:
+    url: ${MARKET_DATA_SERVICE_URL:http://localhost:5001}
+
+logging:
+  level:
+    root: WARN
+    com.quant.stock: INFO
