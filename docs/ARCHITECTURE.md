@@ -97,12 +97,13 @@ web-frontend/
 ```
 
 **核心特性**:
-- 🎯 **智能响应式图表** - 基于视窗比例的动态K线图适配
+
+- 🎯 **智能响应式图表** - 基于视窗比例的动态 K 线图适配
 - 📱 **多设备支持** - 手机、平板、桌面的原生体验
 - ⚡ **实时数据更新** - WebSocket + 轮询的混合策略
 - 🎨 **主题系统** - 深色/浅色模式切换
 
-### 2. Java微服务集群
+### 2. Java 微服务集群
 
 #### 2.1 用户服务 (user-service:8081)
 
@@ -127,7 +128,8 @@ com.quant.user/
     └── JwtConfig.java              # JWT配置
 ```
 
-**API设计**:
+**API 设计**:
+
 ```http
 POST /api/v1/auth/register          # 用户注册
 POST /api/v1/auth/login             # 用户登录
@@ -159,7 +161,8 @@ com.quant.stock/
     └── RedisConfig.java            # Redis配置
 ```
 
-**API设计**:
+**API 设计**:
+
 ```http
 GET  /api/v1/stocks/{code}/latest   # 获取最新股价
 GET  /api/v1/stocks/{code}/history  # 获取历史数据
@@ -194,6 +197,7 @@ com.quant.trading/
 ```
 
 **核心业务逻辑**:
+
 ```java
 @Transactional
 public Trade executeTrade(String userId, String stockCode, TradeType tradeType, Integer quantity, BigDecimal price) {
@@ -216,7 +220,7 @@ public Trade executeTrade(String userId, String stockCode, TradeType tradeType, 
 }
 ```
 
-### 3. Python服务集群
+### 3. Python 服务集群
 
 #### 3.1 市场数据服务 (market-data-service:5001)
 
@@ -236,7 +240,8 @@ market-data-service/
     └── settings.py                 # 配置文件
 ```
 
-**API设计**:
+**API 设计**:
+
 ```http
 GET  /api/stocks/{code}/latest      # 获取最新股价
 GET  /api/stocks/{code}/history     # 获取历史数据
@@ -270,6 +275,7 @@ mock-trading-service/
 ### MySQL 主数据库
 
 #### 用户相关表
+
 ```sql
 -- 用户基础信息表
 CREATE TABLE users (
@@ -298,6 +304,7 @@ CREATE TABLE user_preferences (
 ```
 
 #### 交易相关表
+
 ```sql
 -- 交易账户表
 CREATE TABLE trading_accounts (
@@ -350,6 +357,7 @@ CREATE TABLE trades (
 ### Redis 缓存设计
 
 #### 缓存策略
+
 ```redis
 # 股票实时数据缓存 (TTL: 30秒)
 stock:latest:{code} = {
@@ -387,6 +395,7 @@ market:ranking:gainers = [
 ## 🔄 数据流设计
 
 ### 实时数据流
+
 ```mermaid
 graph LR
     AK[akshare API] --> MDS[market-data-service]
@@ -404,6 +413,7 @@ graph LR
 ```
 
 ### 交易数据流
+
 ```mermaid
 graph TD
     FE[前端交易请求] --> TS[trading-service]
@@ -423,7 +433,7 @@ graph TD
 ### Docker Compose 架构
 
 ```yaml
-version: '3.8'
+version: "3.8"
 services:
   # 前端服务
   web-frontend:
@@ -550,12 +560,14 @@ graph TB
 ## 📊 性能与监控
 
 ### 性能指标
-- **响应时间**: API平均响应时间 < 200ms
-- **吞吐量**: 支持1000 QPS并发请求
+
+- **响应时间**: API 平均响应时间 < 200ms
+- **吞吐量**: 支持 1000 QPS 并发请求
 - **可用性**: 99.9%服务可用性
-- **缓存命中率**: Redis缓存命中率 > 95%
+- **缓存命中率**: Redis 缓存命中率 > 95%
 
 ### 监控指标
+
 ```yaml
 metrics:
   application:
@@ -579,5 +591,5 @@ metrics:
 
 ---
 
-*最后更新: 2025-10-17*
-*架构版本: V2.0 - 微服务 + 虚拟交易*
+_最后更新: 2025-10-17_
+_架构版本: V2.0 - 微服务 + 虚拟交易_
