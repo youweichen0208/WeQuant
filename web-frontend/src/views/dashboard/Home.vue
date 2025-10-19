@@ -129,24 +129,65 @@
         <h2>最近交易</h2>
         <el-link type="primary" @click="router.push('/dashboard/trading')">查看全部</el-link>
       </div>
-      <el-table :data="recentTrades" style="width: 100%">
-        <el-table-column prop="symbol" label="代码" width="100" />
-        <el-table-column prop="name" label="名称" width="150" />
-        <el-table-column prop="type" label="类型" width="80">
-          <template #default="scope">
-            <el-tag :type="scope.row.type === 'buy' ? 'success' : 'danger'" size="small">
-              {{ scope.row.type === 'buy' ? '买入' : '卖出' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="quantity" label="数量" width="100" />
-        <el-table-column prop="price" label="价格" width="100">
-          <template #default="scope">
-            ¥{{ scope.row.price.toFixed(2) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="time" label="时间" />
-      </el-table>
+      <el-card class="trades-card" v-loading="tradesLoading">
+        <div v-if="tradesError" class="error-state">
+          <el-result
+            icon="error"
+            title="交易数据加载失败"
+            :sub-title="tradesError"
+          >
+            <template #extra>
+              <el-button type="primary" @click="loadTradesData">重新加载</el-button>
+            </template>
+          </el-result>
+        </div>
+        <el-table v-else :data="recentTrades" style="width: 100%" stripe>
+          <el-table-column prop="symbol" label="代码" width="100">
+            <template #default="scope">
+              <span class="stock-symbol">{{ scope.row.symbol }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="name" label="名称" width="150">
+            <template #default="scope">
+              <span class="stock-name">{{ scope.row.name }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="type" label="类型" width="80">
+            <template #default="scope">
+              <el-tag
+                :type="scope.row.type === 'buy' ? 'success' : 'danger'"
+                size="small"
+                effect="dark"
+              >
+                {{ scope.row.type === 'buy' ? '买入' : '卖出' }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="quantity" label="数量" width="100">
+            <template #default="scope">
+              <span class="quantity">{{ scope.row.quantity.toLocaleString() }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="price" label="价格" width="100">
+            <template #default="scope">
+              <span class="price">¥{{ scope.row.price.toFixed(2) }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="time" label="时间">
+            <template #default="scope">
+              <span class="time">{{ scope.row.time }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <div v-if="!recentTrades.length && !tradesLoading && !tradesError" class="empty-trades">
+          <el-empty description="暂无交易记录" :image-size="100">
+            <el-button type="primary" @click="router.push('/dashboard/trading')">
+              开始交易
+            </el-button>
+          </el-empty>
+        </div>
+      </el-card>
     </div>
   </div>
 </template>
@@ -180,7 +221,9 @@ const userStats = reactive({
   tradeChange: 3,
 })
 
-// 最近交易数据
+// 最近交易数据和状态
+const tradesLoading = ref(false)
+const tradesError = ref(null)
 const recentTrades = ref([
   {
     symbol: '000001',
@@ -207,6 +250,40 @@ const recentTrades = ref([
     time: '09:15:30',
   },
 ])
+
+// 加载交易数据
+const loadTradesData = async () => {
+  tradesLoading.value = true
+  tradesError.value = null
+
+  try {
+    // 这里应该调用实际的API
+    // const response = await tradesApi.getRecentTrades()
+    // recentTrades.value = response.data
+
+    // 模拟延迟
+    await new Promise(resolve => setTimeout(resolve, 1000))
+
+    console.log('交易数据加载成功')
+  } catch (error) {
+    console.error('加载交易数据失败:', error)
+    tradesError.value = '加载交易数据失败，请稍后重试'
+  } finally {
+    tradesLoading.value = false
+  }
+}
+
+// 加载用户统计数据
+const loadUserStats = async () => {
+  try {
+    // 这里应该调用实际的API
+    // const response = await userApi.getUserStats()
+    // Object.assign(userStats, response.data)
+    console.log('用户统计数据加载成功')
+  } catch (error) {
+    console.error('加载用户统计数据失败:', error)
+  }
+}
 
 // 格式化日期
 const formatDate = (date) => {
@@ -247,7 +324,9 @@ const getRiskTagType = (riskLevel) => {
 }
 
 onMounted(() => {
-  // 这里可以加载用户的实际数据
+  // 加载初始数据
+  loadUserStats()
+  loadTradesData()
   console.log('仪表盘加载完成')
 })
 </script>
@@ -454,34 +533,181 @@ onMounted(() => {
   margin-bottom: 32px;
 }
 
+.stock-chart-section :deep(.el-card) {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.stock-chart-section :deep(.el-card__body) {
+  padding: 24px;
+}
+
+.error-state {
+  padding: 20px;
+}
+
+.empty-trades {
+  padding: 40px 20px;
+  text-align: center;
+}
+
 /* 响应式设计 */
-@media (max-width: 768px) {
-  .welcome-section {
-    flex-direction: column;
-    text-align: center;
-    gap: 20px;
-  }
-
-  .welcome-stats {
-    gap: 20px;
-  }
-
+@media (max-width: 1200px) {
   .stats-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .action-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 768px) {
+  .dashboard-home {
+    padding: 0 16px;
+  }
+
   .welcome-section {
+    flex-direction: column;
+    text-align: center;
+    gap: 20px;
+    padding: 24px;
+  }
+
+  .welcome-stats {
+    gap: 20px;
+    justify-content: center;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .stat-card {
     padding: 20px;
   }
 
   .action-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .action-card {
+    padding: 16px;
+  }
+
+  .recent-trades {
+    padding: 16px;
+  }
+
+  .trades-card :deep(.el-card__body) {
+    padding: 16px;
+  }
+
+  /* 手机端表格优化 */
+  .trades-card :deep(.el-table) {
+    font-size: 12px;
+  }
+
+  .trades-card :deep(.el-table th),
+  .trades-card :deep(.el-table td) {
+    padding: 8px 4px;
+  }
+}
+
+@media (max-width: 480px) {
+  .dashboard-home {
+    padding: 0 12px;
+  }
+
+  .welcome-section {
+    padding: 20px 16px;
+  }
+
+  .welcome-title {
+    font-size: 20px;
+  }
+
+  .welcome-subtitle {
+    font-size: 14px;
+  }
+
+  .welcome-stats {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .stat-value {
+    font-size: 20px;
+  }
+
+  .stat-card {
+    padding: 16px;
+  }
+
+  .stat-number {
+    font-size: 20px;
+  }
+
+  .action-grid {
     grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .action-card {
+    padding: 16px;
+    text-align: center;
+  }
+
+  .action-title {
+    font-size: 14px;
+  }
+
+  .action-desc {
+    font-size: 12px;
+  }
+
+  .section-header h2 {
+    font-size: 18px;
+  }
+
+  /* 超小屏幕表格滚动 */
+  .trades-card {
+    overflow-x: auto;
+  }
+
+  .trades-card :deep(.el-table) {
+    min-width: 500px;
+  }
+}
+
+/* 深色模式适配 */
+@media (prefers-color-scheme: dark) {
+  .dashboard-home {
+    background-color: #1a1a1a;
+  }
+
+  .stat-card,
+  .action-card,
+  .recent-trades {
+    background-color: #2d2d2d;
+    border-color: #444;
+  }
+
+  .welcome-section {
+    background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%);
+  }
+}
+
+/* 高分辨率屏幕优化 */
+@media (min-width: 1920px) {
+  .dashboard-home {
+    max-width: 1800px;
+    margin: 0 auto;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .action-grid {
+    grid-template-columns: repeat(4, 1fr);
   }
 }
 </style>
