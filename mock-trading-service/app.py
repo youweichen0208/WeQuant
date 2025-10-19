@@ -97,42 +97,99 @@ def get_db():
 
 # 获取股票实时价格（模拟）
 def get_stock_price(stock_code):
+    conn = get_db()
+    cursor = conn.cursor()
+
     try:
+        # 首先检查缓存，如果缓存时间小于30秒则直接返回
+        cursor.execute('''
+            SELECT current_price, change_pct, updated_at
+            FROM market_cache
+            WHERE stock_code = ?
+        ''', (stock_code,))
+
+        cached_data = cursor.fetchone()
+
+        if cached_data:
+            # 检查缓存是否在30秒内
+            updated_at = datetime.datetime.fromisoformat(cached_data[2])
+            time_diff = datetime.datetime.now() - updated_at
+
+            if time_diff.total_seconds() < 30:  # 30秒内使用缓存
+                return {
+                    'code': stock_code,
+                    'price': float(cached_data[0]),
+                    'change_pct': float(cached_data[1]),
+                    'name': get_stock_name(stock_code)
+                }
+
         # 尝试从akshare获取实时数据
-        stock_info = ak.stock_zh_a_spot_em()
-        stock_data = stock_info[stock_info['代码'] == stock_code.replace('.SZ', '').replace('.SH', '')]
+        try:
+            stock_info = ak.stock_zh_a_spot_em()
+            stock_data = stock_info[stock_info['代码'] == stock_code.replace('.SZ', '').replace('.SH', '')]
 
-        if not stock_data.empty:
-            return {
-                'code': stock_code,
-                'price': float(stock_data.iloc[0]['最新价']),
-                'change_pct': float(stock_data.iloc[0]['涨跌幅']),
-                'name': stock_data.iloc[0]['名称']
-            }
-    except Exception as e:
-        print(f"获取实时数据失败: {e}")
+            if not stock_data.empty:
+                price = float(stock_data.iloc[0]['最新价'])
+                change_pct = float(stock_data.iloc[0]['涨跌幅'])
 
-    # 模拟价格数据
-    base_prices = {
-        '000001.SZ': 11.40,  # 平安银行
-        '000002.SZ': 18.20,  # 万科A
-        '600036.SH': 35.80,  # 招商银行
-        '600519.SH': 1680.00, # 贵州茅台
-        '000858.SZ': 128.50,  # 五粮液
-        '002415.SZ': 32.15    # 海康威视
-    }
+                # 更新缓存
+                cursor.execute('''
+                    INSERT OR REPLACE INTO market_cache
+                    (stock_code, current_price, change_pct, volume, updated_at)
+                    VALUES (?, ?, ?, ?, ?)
+                ''', (stock_code, price, change_pct, 0, datetime.datetime.now().isoformat()))
+                conn.commit()
 
-    base_price = base_prices.get(stock_code, 10.0)
-    # 添加随机波动
-    fluctuation = random.uniform(-0.05, 0.05)  # ±5%
-    current_price = base_price * (1 + fluctuation)
+                return {
+                    'code': stock_code,
+                    'price': price,
+                    'change_pct': change_pct,
+                    'name': stock_data.iloc[0]['名称']
+                }
+        except Exception as e:
+            print(f"获取实时数据失败: {e}")
 
-    return {
-        'code': stock_code,
-        'price': round(current_price, 2),
-        'change_pct': round(fluctuation * 100, 2),
-        'name': get_stock_name(stock_code)
-    }
+        # 如果获取实时数据失败，使用模拟数据
+        base_prices = {
+            '000001.SZ': 11.40,  # 平安银行
+            '000002.SZ': 18.20,  # 万科A
+            '600036.SH': 35.80,  # 招商银行
+            '600519.SH': 1680.00, # 贵州茅台
+            '000858.SZ': 128.50,  # 五粮液
+            '002415.SZ': 32.15    # 海康威视
+        }
+
+        base_price = base_prices.get(stock_code, 10.0)
+
+        # 如果没有缓存，生成新的价格并缓存
+        if not cached_data:
+            fluctuation = random.uniform(-0.02, 0.02)  # 减少波动到±2%
+            current_price = base_price * (1 + fluctuation)
+            change_pct = fluctuation * 100
+        else:
+            # 如果有缓存但过期了，在原价基础上微调
+            old_price = float(cached_data[0])
+            micro_change = random.uniform(-0.005, 0.005)  # ±0.5%的微调
+            current_price = old_price * (1 + micro_change)
+            change_pct = ((current_price - base_price) / base_price) * 100
+
+        # 更新缓存
+        cursor.execute('''
+            INSERT OR REPLACE INTO market_cache
+            (stock_code, current_price, change_pct, volume, updated_at)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (stock_code, round(current_price, 2), round(change_pct, 2), 0, datetime.datetime.now().isoformat()))
+        conn.commit()
+
+        return {
+            'code': stock_code,
+            'price': round(current_price, 2),
+            'change_pct': round(change_pct, 2),
+            'name': get_stock_name(stock_code)
+        }
+
+    finally:
+        conn.close()
 
 def get_stock_name(stock_code):
     names = {
