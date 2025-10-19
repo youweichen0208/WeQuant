@@ -973,6 +973,325 @@ services:
 # 优势: 生产环境相同，性能测试准确
 ```
 
+### 🔍 H2嵌入式模式 vs SQLite 专项对比
+
+#### 💾 基本特征对比
+
+| 维度 | H2嵌入式模式 | SQLite |
+|------|-------------|--------|
+| **文件格式** | `.h2.db` 文件 | `.db` 文件 |
+| **连接字符串** | `jdbc:h2:./data/app` | `jdbc:sqlite:app.db` |
+| **开发语言** | Java (JVM) | C语言 (原生) |
+| **并发连接** | ❌ **单连接限制** | ❌ **单连接限制** |
+| **跨平台** | ✅ 依赖JVM | ✅ 完全原生 |
+| **文件大小** | 较大 (包含索引) | 较小 (紧凑格式) |
+| **运行时依赖** | 需要JVM环境 | 零依赖 |
+
+#### 🔧 存储实现差异详解
+
+**H2嵌入式模式**:
+```java
+// H2嵌入式文件存储
+spring.datasource.url=jdbc:h2:./data/trading  // 生成 trading.h2.db
+
+存储特点：
+✅ JVM内优化，Java对象直接映射
+✅ 支持Java序列化数据类型
+✅ 内置压缩和加密功能
+✅ 完整SQL标准支持（窗口函数、递归查询）
+❌ 需要JVM环境才能访问
+❌ 文件格式JVM版本敏感
+```
+
+**SQLite文件存储**:
+```python
+# SQLite文件存储
+conn = sqlite3.connect('trading.db')  // 生成 trading.db
+
+存储特点：
+✅ 跨语言通用格式，标准化文件结构
+✅ 可以直接用工具分析和查看
+✅ 文件可以跨平台直接复制使用
+✅ 极小的内存占用和文件大小
+❌ 数据类型系统相对简单
+❌ 部分高级SQL功能受限
+```
+
+#### 📊 数据类型支持对比
+
+**H2嵌入式 - 丰富的Java类型映射**:
+```java
+@Entity
+public class Trade {
+    @Id
+    private UUID id;                    // UUID原生支持
+    private BigDecimal amount;          // 高精度小数
+    private LocalDateTime timestamp;    // Java 8时间API
+    private List<String> tags;          // JSON数组类型
+    private byte[] signature;           // 二进制数据
+
+    // H2支持复杂类型的直接存储和查询
+    @Query("SELECT t FROM Trade t WHERE t.timestamp > :date")
+    List<Trade> findRecentTrades(@Param("date") LocalDateTime date);
+}
+```
+
+**SQLite - 基础数据类型**:
+```sql
+-- SQLite基础类型存储
+CREATE TABLE trades (
+    id TEXT,                    -- UUID需要转换为字符串
+    amount REAL,               -- 可能有浮点精度问题
+    timestamp TEXT,            -- 时间存储为字符串
+    tags TEXT,                 -- JSON数组存储为字符串
+    signature BLOB             -- 二进制数据支持
+);
+
+-- 需要应用层处理类型转换
+SELECT * FROM trades
+WHERE datetime(timestamp) > datetime('2023-01-01');
+```
+
+#### ⚡ 性能特征对比
+
+| 操作类型 | H2嵌入式 | SQLite | 说明 |
+|---------|---------|--------|------|
+| **启动时间** | 100-200ms | 1-5ms | H2需要JVM启动开销 |
+| **简单查询** | 2-5ms | 2-4ms | 性能相近 |
+| **复杂JOIN** | 8-15ms | 12-20ms | H2优化器更强 |
+| **批量插入** | 30ms/1000条 | 40ms/1000条 | H2事务优化更好 |
+| **内存使用** | 20-50MB | 1-5MB | SQLite极低内存占用 |
+| **文件大小** | 较大 | 较小 | SQLite存储更紧凑 |
+
+#### 🎯 跨语言支持对比
+
+**SQLite - 真正的跨语言**:
+```python
+# Python
+import sqlite3
+conn = sqlite3.connect('app.db')
+
+# Java
+Class.forName("org.sqlite.JDBC");
+conn = DriverManager.getConnection("jdbc:sqlite:app.db");
+
+# Node.js
+const sqlite3 = require('sqlite3');
+const db = new sqlite3.Database('app.db');
+
+# Go
+import "database/sql"
+import _ "github.com/mattn/go-sqlite3"
+db, _ := sql.Open("sqlite3", "./app.db")
+
+# 所有语言都能直接读取同一个.db文件
+```
+
+**H2嵌入式 - Java生态专用**:
+```java
+// Java - 原生支持
+Connection conn = DriverManager.getConnection("jdbc:h2:./data/app");
+
+// Python - 需要复杂桥接
+import jaydebeapi
+conn = jaydebeapi.connect("org.h2.Driver",
+                         "jdbc:h2:./data/app",
+                         ["", ""],
+                         "/path/to/h2.jar")
+
+// 其他语言需要通过JDBC桥接，配置复杂
+// 实际项目中很少这样使用
+```
+
+### 🚀 WeQuant项目架构决策深度解析
+
+#### 为什么mock-trading-service选择SQLite而非H2嵌入式？
+
+**技术决策分析**:
+```python
+# 当前架构：Python + SQLite
+import sqlite3
+conn = sqlite3.connect('mock_trading.db')
+
+架构优势：
+1. 🚀 零配置快速启动
+   - Python内置sqlite3模块
+   - 无需下载安装额外驱动
+   - git clone后立即可运行
+
+2. 📊 数据分析生态集成
+   - pandas.read_sql直接读取
+   - Jupyter Notebook直接分析
+   - 数据科学工具链无缝对接
+
+3. 🔄 多服务数据共享
+   - Java服务可通过JDBC读取同一文件
+   - 运维脚本可直接操作数据
+   - 前端工具可直接查看数据
+
+4. 🏗️ 演进路径友好
+   - SQL语法与PostgreSQL基本兼容
+   - 数据迁移工具丰富
+   - 备份恢复简单直接
+```
+
+**如果改用H2嵌入式的影响**:
+```java
+// 假设架构：Python + H2嵌入式
+spring.datasource.url=jdbc:h2:./data/mock_trading
+
+潜在问题：
+❌ Python需要安装JayDeBeApi + H2.jar
+❌ 开发环境配置复杂（Java classpath）
+❌ 数据文件只能在Java环境查看
+❌ 跨语言数据访问性能差
+❌ 部署服务器必须有JVM环境
+
+有限优势：
+✅ 更丰富的SQL功能支持
+✅ 更好的并发性能（虽然单连接限制相同）
+✅ Web控制台调试便利
+```
+
+#### trading-service为什么用H2内存而不是H2嵌入式？
+
+```java
+# 当前选择：H2内存模式
+spring.datasource.url=jdbc:h2:mem:trading_db
+
+vs
+
+# 备选方案：H2嵌入式模式
+spring.datasource.url=jdbc:h2:./data/trading_db
+
+选择内存模式的原因：
+✅ 测试环境隔离 - 每次重启都是干净数据
+✅ 无文件I/O开销 - 测试执行速度更快
+✅ 并发测试友好 - 多个测试实例不冲突
+✅ CI/CD友好 - 无需清理数据文件
+
+如果选择嵌入式模式：
+❌ 需要手动清理测试数据
+❌ 并发测试可能冲突
+❌ CI环境需要文件权限管理
+✅ 数据可以持久化调试
+```
+
+### 💡 实际项目场景选择指南
+
+#### 场景1: Java企业级应用
+
+```java
+// 推荐：H2嵌入式模式
+@Configuration
+public class EmbeddedDatabaseConfig {
+
+    @Bean
+    @Profile("embedded")
+    public DataSource embeddedDataSource() {
+        return new EmbeddedDatabaseBuilder()
+            .setType(EmbeddedDatabaseType.H2)
+            .setName("business_app")
+            .build();
+    }
+}
+
+适用情况：
+✅ 纯Java技术栈
+✅ 需要复杂SQL查询
+✅ Spring Boot框架
+✅ 单机部署应用
+```
+
+#### 场景2: 数据分析平台
+
+```python
+# 推荐：SQLite
+import sqlite3
+import pandas as pd
+
+# 数据收集
+conn = sqlite3.connect('analytics.db')
+df.to_sql('user_behavior', conn, if_exists='append')
+
+# 数据分析
+analysis_df = pd.read_sql("""
+    SELECT date, COUNT(*) as active_users
+    FROM user_behavior
+    GROUP BY date
+""", conn)
+
+适用情况：
+✅ Python/R数据科学栈
+✅ 需要跨工具数据共享
+✅ 快速原型验证
+✅ 文件导入导出需求
+```
+
+#### 场景3: 微服务架构
+
+```yaml
+# 推荐：根据服务特点选择
+services:
+  user-service:        # Java + H2嵌入式（配置数据）
+    environment:
+      DB_URL: jdbc:h2:./data/users
+
+  analytics-service:   # Python + SQLite（分析数据）
+    environment:
+      DB_PATH: /data/analytics.db
+
+  test-service:        # Java + H2内存（测试数据）
+    environment:
+      DB_URL: jdbc:h2:mem:testdb
+```
+
+### 🔄 迁移策略建议
+
+#### SQLite → H2嵌入式迁移
+
+```bash
+# 1. 数据导出
+sqlite3 app.db ".dump" > backup.sql
+
+# 2. 语法适配（主要差异）
+sed -i 's/INTEGER PRIMARY KEY AUTOINCREMENT/BIGINT AUTO_INCREMENT PRIMARY KEY/g' backup.sql
+sed -i 's/datetime(/PARSEDATETIME(/g' backup.sql
+
+# 3. H2导入
+java -cp h2*.jar org.h2.tools.RunScript -url jdbc:h2:./data/app -script backup.sql
+```
+
+#### H2嵌入式 → SQLite迁移
+
+```java
+// 1. 数据导出
+java -cp h2*.jar org.h2.tools.Script -url jdbc:h2:./data/app -script export.sql
+
+// 2. 语法适配
+// H2: BIGINT AUTO_INCREMENT PRIMARY KEY
+// SQLite: INTEGER PRIMARY KEY AUTOINCREMENT
+
+// 3. SQLite导入
+sqlite3 app.db < adapted_export.sql
+```
+
+### 📊 混合架构最佳实践
+
+```
+开发阶段架构优化：
+├── 原型服务: Python + SQLite (快速验证)
+├── 测试服务: Java + H2内存 (单元测试)
+├── 集成服务: Java + H2嵌入式 (集成测试)
+└── 数据分析: Python + SQLite (共享数据)
+
+生产阶段演进：
+├── 用户数据: PostgreSQL (高可用)
+├── 缓存层: Redis (高性能)
+├── 配置数据: H2嵌入式 (简单部署)
+└── 分析数据: SQLite (离线分析)
+```
+
 ### 📊 H2 vs SQLite 深度对比
 
 #### 🔍 核心差异分析
