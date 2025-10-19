@@ -7,9 +7,20 @@
           <template #header>
             <div class="card-header">
               <h3>模拟交易账户</h3>
-              <el-button v-if="!accountId" type="primary" @click="createAccount">
-                创建模拟账户
-              </el-button>
+              <div class="header-actions">
+                <el-button v-if="!accountId" type="primary" @click="createAccount">
+                  创建模拟账户
+                </el-button>
+                <el-button
+                  v-if="accountId"
+                  type="warning"
+                  :icon="RefreshRight"
+                  @click="showResetDialog = true"
+                  size="small"
+                >
+                  重置账户
+                </el-button>
+              </div>
             </div>
           </template>
 
@@ -239,13 +250,51 @@
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- 重置账户确认对话框 -->
+    <el-dialog
+      v-model="showResetDialog"
+      title="重置模拟交易账户"
+      width="400px"
+      center
+    >
+      <div class="reset-dialog-content">
+        <el-alert
+          title="警告"
+          type="warning"
+          :closable="false"
+          show-icon
+        >
+          <p>重置账户将会：</p>
+          <ul>
+            <li>🔄 重置资金为100万元</li>
+            <li>🗑️ 清空所有持仓</li>
+            <li>📝 删除交易历史记录</li>
+          </ul>
+          <p><strong>此操作不可撤销！</strong></p>
+        </el-alert>
+      </div>
+
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="showResetDialog = false">取消</el-button>
+          <el-button
+            type="danger"
+            @click="resetAccount"
+            :loading="resetting"
+          >
+            确认重置
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh } from '@element-plus/icons-vue'
+import { Search, Refresh, RefreshRight } from '@element-plus/icons-vue'
 import axios from 'axios'
 
 // 响应式数据
@@ -255,6 +304,8 @@ const currentPrice = ref(null)
 const tradeHistory = ref([])
 const loading = ref(false)
 const trading = ref(false)
+const showResetDialog = ref(false)
+const resetting = ref(false)
 
 // 交易表单
 const tradeForm = reactive({
@@ -428,6 +479,55 @@ const formatTime = (timeStr) => {
   return new Date(timeStr).toLocaleString('zh-CN')
 }
 
+// 重置账户函数
+const resetAccount = async () => {
+  if (!accountId.value) {
+    ElMessage.error('没有找到账户信息')
+    return
+  }
+
+  resetting.value = true
+
+  try {
+    const response = await axios.post(`${API_BASE}/account/${accountId.value}/reset`)
+
+    if (response.data.success) {
+      ElMessage.success({
+        message: response.data.message,
+        duration: 3000
+      })
+
+      // 显示重置详情
+      const details = response.data.reset_details
+      ElMessage.info({
+        message: `重置完成：余额 ${formatCurrency(details.new_balance)}，清空 ${details.deleted_positions} 个持仓，删除 ${details.deleted_trades} 条交易记录`,
+        duration: 5000
+      })
+
+      // 关闭对话框
+      showResetDialog.value = false
+
+      // 刷新数据
+      await loadAccountInfo()
+      await loadTradeHistory()
+
+      // 清空交易表单
+      tradeForm.stockCode = ''
+      tradeForm.type = 'buy'
+      tradeForm.quantity = 100
+      currentPrice.value = null
+
+    } else {
+      ElMessage.error('重置失败：' + response.data.error)
+    }
+
+  } catch (error) {
+    ElMessage.error('重置账户失败：' + (error.response?.data?.error || error.message))
+  } finally {
+    resetting.value = false
+  }
+}
+
 // 监听股票代码变化
 watch(() => tradeForm.stockCode, (newCode) => {
   if (newCode && newCode.match(/^\d{6}\.(SZ|SH)$/)) {
@@ -466,6 +566,26 @@ onMounted(() => {
 .card-header h3,
 .card-header h4 {
   margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.reset-dialog-content {
+  padding: 10px 0;
+}
+
+.reset-dialog-content ul {
+  margin: 10px 0;
+  padding-left: 20px;
+}
+
+.reset-dialog-content li {
+  margin: 5px 0;
+  font-size: 14px;
 }
 
 .account-info {

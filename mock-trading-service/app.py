@@ -445,6 +445,62 @@ def get_market_data(stock_code):
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/account/<account_id>/reset', methods=['POST'])
+def reset_account(account_id):
+    """重置账户数据 - 专用于测试"""
+    conn = get_db()
+    cursor = conn.cursor()
+
+    try:
+        # 检查账户是否存在
+        cursor.execute('SELECT id FROM accounts WHERE id = ?', (account_id,))
+        account = cursor.fetchone()
+        if not account:
+            return jsonify({'error': '账户不存在'}), 404
+
+        # 开始事务
+        cursor.execute('BEGIN TRANSACTION')
+
+        # 1. 清空持仓记录
+        cursor.execute('DELETE FROM positions WHERE account_id = ?', (account_id,))
+        deleted_positions = cursor.rowcount
+
+        # 2. 清空交易历史记录
+        cursor.execute('DELETE FROM trades WHERE account_id = ?', (account_id,))
+        deleted_trades = cursor.rowcount
+
+        # 3. 重置账户余额为100万
+        initial_balance = 1000000.00
+        cursor.execute('''
+            UPDATE accounts
+            SET balance = ?, total_assets = ?
+            WHERE id = ?
+        ''', (initial_balance, initial_balance, account_id))
+
+        # 提交事务
+        cursor.execute('COMMIT')
+
+        return jsonify({
+            'success': True,
+            'message': '账户重置成功',
+            'reset_details': {
+                'new_balance': initial_balance,
+                'new_total_assets': initial_balance,
+                'deleted_positions': deleted_positions,
+                'deleted_trades': deleted_trades
+            }
+        })
+
+    except Exception as e:
+        # 回滚事务
+        cursor.execute('ROLLBACK')
+        return jsonify({
+            'success': False,
+            'error': f'重置账户失败: {str(e)}'
+        }), 500
+    finally:
+        conn.close()
+
 if __name__ == '__main__':
     init_db()
     print("模拟交易服务启动中...")
