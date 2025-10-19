@@ -270,4 +270,15 @@ public class TradingService {
             default -> "未知股票";
         };
     }
+
+    /**
+     * 重置账户数据
+     * 将用户账户恢复到初始状态：100万资金，无持仓
+     */
+    private void resetAccount() {
+        // TODO: 实现账户重置功能
+        // 1. 清空用户持仓
+        // 2. 重置资金为1,000,000
+        // 3. 清除交易历史（可选）
+    }
 }
