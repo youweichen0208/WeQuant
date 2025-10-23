@@ -74,6 +74,15 @@ const routes = [
         },
       },
       {
+        path: 'strategy',
+        name: 'Strategy',
+        component: () => import('@/views/dashboard/Strategy.vue'),
+        meta: {
+          title: '策略管理',
+          requiresAuth: true,
+        },
+      },
+      {
         path: 'settings',
         name: 'Settings',
         component: () => import('@/views/dashboard/Settings.vue'),

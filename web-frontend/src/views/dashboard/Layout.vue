@@ -31,6 +31,11 @@
           <span>数据分析</span>
         </el-menu-item>
 
+        <el-menu-item index="strategy">
+          <el-icon><Lightning /></el-icon>
+          <span>策略管理</span>
+        </el-menu-item>
+
         <el-menu-item index="settings">
           <el-icon><Setting /></el-icon>
           <span>设置</span>
@@ -85,6 +90,7 @@ import {
   PieChart,
   TrendCharts,
   DataAnalysis,
+  Lightning,
   Setting,
   ArrowDown,
 } from '@element-plus/icons-vue'
@@ -101,6 +107,7 @@ const activeMenu = computed(() => {
   if (path.includes('portfolio')) return 'portfolio'
   if (path.includes('trading')) return 'trading'
   if (path.includes('analysis')) return 'analysis'
+  if (path.includes('strategy')) return 'strategy'
   if (path.includes('settings')) return 'settings'
   return 'dashboard'
 })
@@ -112,6 +119,7 @@ const getCurrentPageTitle = () => {
     portfolio: '投资组合',
     trading: '交易中心',
     analysis: '数据分析',
+    strategy: '策略管理',
     settings: '设置',
   }
   return titles[activeMenu.value] || '仪表盘'
@@ -124,6 +132,7 @@ const handleMenuSelect = (index) => {
     portfolio: '/dashboard/portfolio',
     trading: '/dashboard/trading',
     analysis: '/dashboard/analysis',
+    strategy: '/dashboard/strategy',
     settings: '/dashboard/settings',
   }
 
